@@ -9,17 +9,22 @@ function sync_user_cache(): int
     try {
         // users berada di database berbeda dalam satu mesin yang sama.
         $rows = ssoDb()->query("SELECT id, nik, name, email, position, division, department, avatar, is_active FROM users")->fetchAll();
+        // Catatan: dengan PDO::ATTR_EMULATE_PREPARES=false, placeholder yang sama
+        // tidak boleh dipakai berulang -> gunakan nama unik per kemunculan.
         $upsert = db()->prepare(
-            "INSERT INTO user_cache (user_id, nik, name, email, phone, position, nama_bidang, nama_divisi, avatar, is_active)
-             VALUES (:id,:nik,:name,:email,'',:position,:division,:department,:avatar,:active)
-             ON DUPLICATE KEY UPDATE nik=:nik, name=:name, email=:email, position=:position,
-               nama_bidang=:division, nama_divisi=:department, avatar=:avatar, is_active=:active"
+            "INSERT INTO user_cache (user_id, nik, name, email, position, nama_bidang, nama_divisi, avatar, is_active)
+             VALUES (:id,:nik,:name,:email,:position,:division,:department,:avatar,:active)
+             ON DUPLICATE KEY UPDATE nik=:nik2, name=:name2, email=:email2, position=:position2,
+               nama_bidang=:division2, nama_divisi=:department2, avatar=:avatar2, is_active=:active2"
         );
         foreach ($rows as $r) {
             $upsert->execute([
                 ':id' => $r['id'], ':nik' => $r['nik'], ':name' => $r['name'], ':email' => $r['email'],
                 ':position' => $r['position'], ':division' => $r['division'], ':department' => $r['department'],
                 ':avatar' => $r['avatar'], ':active' => $r['is_active'] ?? 1,
+                ':nik2' => $r['nik'], ':name2' => $r['name'], ':email2' => $r['email'],
+                ':position2' => $r['position'], ':division2' => $r['division'], ':department2' => $r['department'],
+                ':avatar2' => $r['avatar'], ':active2' => $r['is_active'] ?? 1,
             ]);
             $count++;
         }
