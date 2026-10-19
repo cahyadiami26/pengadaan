@@ -244,7 +244,18 @@ require __DIR__ . '/../includes/header.php';
       <td><?= status_badge($l['status']) ?></td>
       <td>
         <?php if ($canManage && $l['status'] === 'MENUNGGU'): ?>
-          <a class="btn btn-sm btn-teal" href="peminjaman_detail.php?id=<?= (int)$l['id'] ?>">✔ Proses</a>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <form method="post" style="display:inline">
+              <input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+              <button class="btn btn-sm btn-primary" title="Setujui">✔</button>
+            </form>
+            <form method="post" style="display:inline" onsubmit="return confirm('Tolak pengajuan <?= e($l['loan_no']) ?>?')">
+              <input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+              <input type="hidden" name="reject_reason" value="Ditolak oleh Bagian Umum/Pengadaan">
+              <button class="btn btn-sm btn-danger" title="Tolak">✖</button>
+            </form>
+            <a class="btn btn-sm btn-teal" href="peminjaman_detail.php?id=<?= (int)$l['id'] ?>">Detail</a>
+          </div>
         <?php elseif ($l['status'] === 'DISETUJUI' && $canManage): ?>
           <a class="btn btn-sm btn-primary" href="peminjaman_detail.php?id=<?= (int)$l['id'] ?>#serahkan">🤝 Serahkan</a>
         <?php elseif ($l['status'] === 'DIGUNAKAN' && $canManage): ?>

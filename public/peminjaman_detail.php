@@ -4,7 +4,154 @@
  * tanda tangan canvas), dan pengembalian (KM akhir, kondisi, catatan).
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
-$id = (int)($_GET['id'] ?? 0);
+$id = (int)($_GET['id'] ?? ($_POST['id'] ?? 0));
+
+/* ================= POST (approve / reject / handover_out / return) =================
+   Form pada halaman ini sebelumnya tidak memiliki atribut action sehingga POST
+   dikirim kembali ke peminjaman_detail.php — namun handler POST hanya ada di
+   peminjaman.php sehingga tombol Setujui/Tolak tampak tidak berfungsi.
+   Handler kini ditempatkan langsung di halaman detail ini. */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $act = $_POST['action'] ?? '';
+    $lid = (int)($_POST['id'] ?? 0);
+    $canManageNow = is_in_role(['admin', 'staff_pengadaan']);
+    if (!$canManageNow) { flash_set('danger', 'Anda tidak memiliki hak akses untuk memproses peminjaman.'); header('Location: peminjaman_detail.php?id=' . $lid); exit; }
+
+    /* ---- Persetujuan / Penolakan ---- */
+    if ($act === 'approve' || $act === 'reject') {
+        $cur = q("SELECT * FROM vehicle_loans WHERE id=?", [$lid])->fetch();
+        if ($cur && $cur['status'] === 'MENUNGGU') {
+            if ($act === 'approve') {
+                q("UPDATE vehicle_loans SET status='DISETUJUI', approved_by=?, approve_note=? WHERE id=?",
+                  [$_SESSION['user_id'], trim($_POST['approve_note'] ?? ''), $lid]);
+                flash_set('success', 'Pengajuan <b>' . e($cur['loan_no']) . '</b> disetujui. Silakan lakukan serah terima kendaraan (KM awal otomatis dari data kendaraan).');
+            } else {
+                $reason = trim($_POST['reject_reason'] ?? '');
+                if ($reason === '') $reason = 'Ditolak oleh Bagian Umum/Pengadaan';
+                q("UPDATE vehicle_loans SET status='DITOLAK', approved_by=?, approve_note=?, rejected_at=NOW() WHERE id=?",
+                  [$_SESSION['user_id'], $reason, $lid]);
+                flash_set('info', 'Pengajuan <b>' . e($cur['loan_no']) . '</b> ditolak.');
+            }
+            refresh_notification_cache();
+        } else {
+            flash_set('warning', 'Peminjaman tidak berada pada status MENUNGGU (mungkin sudah diproses sebelumnya).');
+        }
+        header('Location: peminjaman_detail.php?id=' . $lid); exit;
+    }
+
+    /* ---- Serah terima kendaraan keluar (DISETUJUI -> DIGUNAKAN) ---- */
+    if ($act === 'handover_out') {
+        $l2 = q("SELECT * FROM vehicle_loans WHERE id=?", [$lid])->fetch();
+        $v2 = $l2 ? q("SELECT * FROM vehicles WHERE id=?", [$l2['vehicle_id']])->fetch() : null;
+        $toUserId  = (int)($_POST['to_user_id'] ?? 0);
+        $date      = $_POST['handover_date'] ?: date('Y-m-d');
+        $time      = $_POST['handover_time'] ?: date('H:i');
+        $kmInput   = (int)($_POST['start_km'] ?? 0);
+        $itemsDesc = trim($_POST['items_desc'] ?? '');
+        $note      = trim($_POST['note'] ?? '');
+        $sigGiver  = save_signature_png($_POST['sig_giver'] ?? null);
+        $sigReceiv = save_signature_png($_POST['sig_receiver'] ?? null);
+
+        $errors = [];
+        if (!$l2 || $l2['status'] !== 'DISETUJUI') $errors[] = 'Pengajuan tidak berada pada status DISETUJUI.';
+        if (!$toUserId) $errors[] = 'Penerima (peminjam) wajib dipilih.';
+        if ($v2 && $kmInput < (int)$v2['last_km']) $errors[] = 'KM awal tidak boleh kurang dari KM terakhir kendaraan (' . number_format((int)$v2['last_km'], 0, ',', '.') . ' km).';
+        if ($itemsDesc === '') $errors[] = 'Detail serah terima wajib diisi.';
+        if (!$sigReceiv) $errors[] = 'Tanda tangan penerima wajib dibuat pada canvas.';
+
+        if (!$errors) {
+            db()->beginTransaction();
+            try {
+                $no = gen_no('handovers', 'handover_no', 'ST');
+                q("INSERT INTO handovers (handover_no, ref_type, ref_id, from_user_id, to_user_id, handover_date, items_desc, sig_giver, sig_receiver, note)
+                   VALUES (?, 'peminjaman_kendaraan', ?, ?, ?, ?, ?, ?, ?, ?)",
+                  [$no, $l2['id'], $_SESSION['user_id'], $toUserId, $date . ' ' . $time . ':00', $itemsDesc, $sigGiver, $sigReceiv, $note]);
+                $hid = (int)db()->lastInsertId();
+                q("UPDATE vehicle_loans SET status='DIGUNAKAN', start_km=?, handover_out_id=?, start_date=? WHERE id=?",
+                  [$kmInput, $hid, $date . ' ' . $time . ':00', $l2['id']]);
+                q("UPDATE vehicles SET status='DIPINJAM', last_km=? WHERE id=?", [max($kmInput, (int)$v2['last_km']), $v2['id']]);
+                q("INSERT INTO vehicle_usage_logs (vehicle_id, loan_id, user_id, destination, borrow_date, start_km, status)
+                   VALUES (?,?,?,?,?,?, 'DIGUNAKAN')",
+                  [$v2['id'], $l2['id'], $toUserId, mb_strimwidth($l2['purpose'], 0, 190, '…'), $date . ' ' . $time . ':00', $kmInput]);
+                db()->commit();
+                refresh_notification_cache();
+                flash_set('success', 'Serah terima kendaraan <b>' . e($no) . '</b> tersimpan. Status peminjaman: DIGUNAKAN.');
+                header('Location: peminjaman_detail.php?id=' . $l2['id']); exit;
+            } catch (Throwable $ex) {
+                db()->rollBack();
+                flash_set('danger', 'Gagal menyimpan: ' . $ex->getMessage());
+            }
+        }
+        foreach ($errors as $er) flash_set('danger', $er);
+        header('Location: peminjaman_detail.php?id=' . $lid . '#serahkan'); exit;
+    }
+
+    /* ---- Pengembalian kendaraan (DIGUNAKAN -> DIKEMBALIKAN, update KM) ---- */
+    if ($act === 'return') {
+        $l2 = q("SELECT * FROM vehicle_loans WHERE id=?", [$lid])->fetch();
+        $v2 = $l2 ? q("SELECT * FROM vehicles WHERE id=?", [$l2['vehicle_id']])->fetch() : null;
+        $fromUserId = (int)($_POST['from_user_id'] ?? 0);
+        $date       = $_POST['handover_date'] ?: date('Y-m-d');
+        $time       = $_POST['handover_time'] ?: date('H:i');
+        $endKm      = isset($_POST['end_km']) && $_POST['end_km'] !== '' ? (int)$_POST['end_km'] : null;
+        $condition  = trim($_POST['return_condition'] ?? '');
+        $note       = trim($_POST['notes'] ?? '');
+        $fuelCost   = (float)($_POST['fuel_cost'] ?? 0);
+        $itemsDesc  = trim($_POST['items_desc'] ?? '');
+        $sigGiver   = save_signature_png($_POST['sig_giver'] ?? null);
+        $sigReceiv  = save_signature_png($_POST['sig_receiver'] ?? null);
+
+        $errors = [];
+        if (!$l2 || $l2['status'] !== 'DIGUNAKAN') $errors[] = 'Peminjaman tidak berada pada status DIGUNAKAN.';
+        if (!$fromUserId) $errors[] = 'Pihak yang mengembalikan (peminjam) wajib dipilih.';
+        if ($endKm === null) $errors[] = 'KM akhir wajib diisi.';
+        elseif ($l2 && $endKm < (int)$l2['start_km']) $errors[] = 'KM akhir tidak boleh kurang dari KM awal (' . number_format((int)$l2['start_km'], 0, ',', '.') . ' km).';
+        if ($condition === '') $errors[] = 'Kondisi pengembalian wajib dipilih.';
+        if ($itemsDesc === '') $errors[] = 'Detail pengembalian wajib diisi.';
+        if (!$sigReceiv) $errors[] = 'Tanda tangan penerima kembali (Bagian Umum) wajib dibuat pada canvas.';
+
+        if (!$errors) {
+            db()->beginTransaction();
+            try {
+                $no = gen_no('handovers', 'handover_no', 'ST');
+                q("INSERT INTO handovers (handover_no, ref_type, ref_id, from_user_id, to_user_id, handover_date, items_desc, sig_giver, sig_receiver, note)
+                   VALUES (?, 'pengembalian_kendaraan', ?, ?, ?, ?, ?, ?, ?, ?)",
+                  [$no, $l2['id'], $fromUserId, $_SESSION['user_id'], $date . ' ' . $time . ':00', $itemsDesc, $sigGiver, $sigReceiv, $note]);
+                $hid = (int)db()->lastInsertId();
+                q("UPDATE vehicle_loans SET status='DIKEMBALIKAN', end_km=?, end_date=?, return_condition=?, return_note=?, fuel_cost=?,
+                        handover_in_id=?, returned_at=?, confirmed_by=? WHERE id=?",
+                  [$endKm, $date . ' ' . $time . ':00', $condition, $note, $fuelCost, $hid, $date . ' ' . $time . ':00', $_SESSION['user_id'], $l2['id']]);
+                // Update KM kendaraan & kembalikan status ke TERSEDIA
+                if ($v2) {
+                    $svcCol = q("SHOW COLUMNS FROM vehicles LIKE 'next_service_km'")->fetch();
+                    $intCol = q("SHOW COLUMNS FROM vehicles LIKE 'service_interval_km'")->fetch();
+                    if ($svcCol && $intCol) {
+                        q("UPDATE vehicles SET last_km=?, next_service_km=?+service_interval_km, status='TERSEDIA' WHERE id=?",
+                          [$endKm, $endKm, $v2['id']]);
+                    } else {
+                        q("UPDATE vehicles SET last_km=?, status='TERSEDIA' WHERE id=?", [$endKm, $v2['id']]);
+                    }
+                }
+                q("UPDATE vehicle_usage_logs SET return_date=?, end_km=?, status='SELESAI' WHERE loan_id=?",
+                  [$date . ' ' . $time . ':00', $endKm, $l2['id']]);
+                db()->commit();
+                refresh_notification_cache();
+                $usage = $endKm - (int)$l2['start_km'];
+                flash_set('success', 'Pengembalian <b>' . e($no) . '</b> tersimpan. Pemakaian ' . number_format($usage, 0, ',', '.') . ' km — KM kendaraan diperbarui ke ' . number_format($endKm, 0, ',', '.') . ' km.');
+                header('Location: peminjaman_detail.php?id=' . $l2['id']); exit;
+            } catch (Throwable $ex) {
+                db()->rollBack();
+                flash_set('danger', 'Gagal menyimpan: ' . $ex->getMessage());
+            }
+        }
+        foreach ($errors as $er) flash_set('danger', $er);
+        header('Location: peminjaman_detail.php?id=' . $lid . '#kembalikan'); exit;
+    }
+
+    flash_set('danger', 'Aksi tidak dikenali.');
+    header('Location: peminjaman_detail.php?id=' . $lid); exit;
+}
+
 $l = q("SELECT l.*, v.tnkb, v.brand_model, v.year, v.last_km AS veh_km, v.location AS veh_loc, v.pic AS veh_pic,
                uc.name AS peminjam, uc.avatar AS peminjam_avatar, uc.position AS peminjam_jab, uc.nama_bidang,
                ab.name AS approving_name
