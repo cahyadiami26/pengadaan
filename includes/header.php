@@ -31,7 +31,7 @@ $nav = [
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= e($pageTitle) ?> - <?= e(APP_COMPANY) ?></title>
 <link rel="icon" href="<?= e(LOGO_BASE_URL) ?>logo.png" type="image/png">
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="https://lju.co.id/assets/css/style.css">
 </head>
 <body>
 <div class="app-shell">
