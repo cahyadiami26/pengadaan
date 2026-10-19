@@ -150,7 +150,7 @@ require __DIR__ . '/../includes/header.php';
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
       <a class="btn btn-outline" href="<?= $supplyReq ? 'perlengkapan.php?tab=request' : 'serah_terima.php' ?>">Batal</a>
       <button class="btn btn-primary"
-        onsubmit="" onclick="exportSignature('sigG','sigGiverData');exportSignature('sigR','sigReceiverData')">
+        >
         💾 Simpan &amp; Proses Distribusi
       </button>
     </div>

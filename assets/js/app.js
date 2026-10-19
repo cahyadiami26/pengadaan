@@ -162,11 +162,20 @@ function initEnhancedSelect(sel, withSearch) {
   syncLabel();
 }
 
-/* Signature pad pada form serah terima */
+/* Signature pad pada form serah terima.
+   Selector diperluas: semua <canvas> dengan id sig* (sigG/sigR), atau class .sig-canvas,
+   agar form peminjaman kendaraan & serah terima perlengkapan sama-sama berfungsi. */
 function initSignatureCanvases() {
-  document.querySelectorAll('canvas.sig-canvas').forEach(initSignature);
+  var seen = new Set();
+  document.querySelectorAll('canvas.sig-canvas, canvas[id^="sig"]').forEach(function (c) {
+    if (seen.has(c)) return;
+    seen.add(c);
+    initSignature(c);
+  });
 }
 function initSignature(canvas) {
+  if (canvas.dataset.sigInit === '1') return; // hindari inisialisasi ganda
+  canvas.dataset.sigInit = '1';
   var ctx = canvas.getContext('2d');
   var drawing = false, last = null;
   function pos(e) {
