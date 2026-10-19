@@ -11,6 +11,17 @@ $h = q("SELECT h.*, uc1.name AS pemberi, uc1.position AS pemberi_jab,
         LEFT JOIN user_cache uc2 ON uc2.user_id = h.to_user_id WHERE h.id=?", [$id])->fetch();
 if (!$h) exit('Data tidak ditemukan');
 
+// Judul dinamis sesuai jenis serah terima (kendaraan vs barang/ATK)
+$refType = $h['ref_type'] ?? '';
+$isKendaraan = in_array($refType, ['peminjaman_kendaraan', 'pengembalian_kendaraan'], true);
+if ($isKendaraan) {
+    $docTitle = 'BERITA ACARA SERAH TERIMA KENDARAAN';
+    $kalimat  = 'serah terima kendaraan';
+} else {
+    $docTitle = 'BERITA ACARA SERAH TERIMA BARANG';
+    $kalimat  = 'serah terima barang';
+}
+
 $absImg = function (?string $rel): string {
     return $rel ? 'file://' . BASE_PATH . '/' . ltrim($rel, '/') : '';
 };
@@ -35,8 +46,8 @@ $sigBlock = '<table width="100%" style="margin-top:34px"><tr>'
   . '</td></tr></table>';
 
 $html = pdf_wrap(
-    pdf_doc_header('BERITA ACARA SERAH TERIMA BARANG', 'Nomor: ' . $h['handover_no'])
-  . '<p style="text-align:justify;line-height:1.6">Pada hari ini, kami yang bertanda tangan di bawah ini menyatakan bahwa telah terjadi serah terima barang dari Bagian Umum/Pengadaan kepada pihak penerima dengan rincian sebagai berikut:</p>'
+    pdf_doc_header($docTitle, 'Nomor: ' . $h['handover_no'])
+  . '<p style="text-align:justify;line-height:1.6">Pada hari ini, kami yang bertanda tangan di bawah ini menyatakan bahwa telah terjadi ' . $kalimat . ' dari Bagian Umum/Pengadaan kepada pihak penerima dengan rincian sebagai berikut:</p>'
   . $rows . $sigBlock
   . '<p class="muted" style="margin-top:26px">Dokumen ini dihasilkan secara elektronik oleh Sistem Pengadaan Barang/Jasa PT. Lampung Jasa Utama (' . e(APP_URL) . ').</p>'
 );

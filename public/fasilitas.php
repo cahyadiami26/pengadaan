@@ -36,7 +36,7 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="card"><h3>🏢 Fasilitas Kantor &amp; Gudang
   <?php if (is_in_role(['admin','staff_pengadaan'])): ?><button class="btn btn-sm btn-primary" onclick="openModal('mFac')">➕ Tambah Fasilitas</button><?php endif; ?>
-  <a class="btn btn-sm btn-teal" href="laporan_pdf.php?jenis=inv_lokasi">📄 Export PDF Inventaris Ruangan</a></h3>
+  <a class="btn btn-sm btn-teal" href="laporan_pdf.php?jenis=aset_lokasi">📄 Export PDF Inventaris Ruangan</a></h3>
 <form method="get" class="filters"><div class="form-group"><label>Tipe</label><select name="tipe" onchange="this.form.submit()">
 <option value="">Semua</option><?php foreach (['AC','Proyektor','Meja','Kursi','Lemari','Printer','Televisi','Lainnya'] as $s): ?><option <?= $fType===$s?'selected':'' ?>><?= $s ?></option><?php endforeach; ?></select></div></form>
 <div class="grid grid-4">

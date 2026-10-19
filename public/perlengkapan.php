@@ -162,7 +162,7 @@ require __DIR__ . '/../includes/header.php';
 <h3>🖇️ Perlengkapan Kantor / ATK
   <?php if ($lowCount): ?><span class="badge badge-danger">⚠ <?= (int)$lowCount ?> stok di bawah minimum</span><?php endif; ?>
   <?php if (is_in_role(['admin','staff_pengadaan'])): ?><button class="btn btn-sm btn-primary" onclick="openModal('mItem')">➕ Tambah Barang</button><?php endif; ?>
-  <a class="btn btn-sm btn-teal" href="laporan_pdf.php?jenis=stok_atk">📄 Export PDF Stok</a>
+  <a class="btn btn-sm btn-teal" href="laporan_pdf.php?jenis=atk_stok">📄 Export PDF Stok</a>
 </h3>
 <div class="tabs">
   <a class="tab <?= $tab==='stok'?'active':'' ?>" href="perlengkapan.php">Stok Barang</a>

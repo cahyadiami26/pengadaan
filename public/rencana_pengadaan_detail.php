@@ -19,7 +19,7 @@ require __DIR__ . '/../includes/header.php';
   <h3>🗂️ <?= e($row['plan_no']) ?> <?= status_badge($row['status']) ?>
     <span>
       <?php if (is_in_role(['admin','staff_pengadaan']) && $row['status']==='DRAFT'): ?><a class="btn btn-sm btn-outline" href="rencana_pengadaan_form.php?id=<?= $id ?>">✏️ Edit</a><?php endif; ?>
-      <a class="btn btn-sm btn-outline" href="laporan_pdf.php?type=rencana&id=<?= $id ?>">🖨 PDF</a>
+      <a class="btn btn-sm btn-outline" href="laporan_pdf.php?jenis=rencana&id=<?= $id ?>">🖨 PDF</a>
       <a class="btn btn-sm btn-outline" href="rencana_pengadaan.php">← Kembali</a>
     </span>
   </h3>

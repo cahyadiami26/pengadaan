@@ -7,12 +7,17 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_once BASE_PATH . '/includes/pdf.php';
 
 $JENIS = ['pengadaan','belum_diterima','inventaris','inventaris_pegawai','mutasi','riwayat_aset',
-          'atk_stok','atk_transaksi','atk_distribusi','kerusakan','kendaraan','kendaraan_servis','aset_lokasi'];
-$j    = $_GET['jenis'] ?? 'pengadaan';
+          'atk_stok','atk_transaksi','atk_distribusi','kerusakan','kendaraan','kendaraan_servis','aset_lokasi',
+          'penerimaan','perlengkapan','serah_terima_kendaraan','rencana'];
+// Alias jenis lama agar tautan di modul tetap mengarah ke laporan yang benar
+$ALIAS = ['inv_lokasi' => 'aset_lokasi', 'stok_atk' => 'atk_stok', 'inv_pegawai' => 'inventaris_pegawai'];
+$j    = $_GET['jenis'] ?? ($_GET['type'] ?? 'pengadaan');
+if (isset($ALIAS[$j])) $j = $ALIAS[$j];
 if (!in_array($j, $JENIS, true)) $j = 'pengadaan';
 $from = $_GET['from'] ?? date('Y-01-01');
 $to   = $_GET['to'] ?? date('Y-m-d');
 $locId = (int)($_GET['lokasi'] ?? 0);
+$docId = (int)($_GET['id'] ?? 0);
 
 function tbl(array $head, array $rows): string
 {
@@ -266,6 +271,143 @@ case 'aset_lokasi':
     $body .= tbl(['Kode Aset', 'Nama', 'Kategori', 'Merk/Model', 'Pengguna', 'Tgl Perolehan', 'Nilai (Rp)', 'Kondisi', 'Status'], $rows);
     $body .= '<p><b>Jumlah: ' . count($assets) . ' item · Total nilai: Rp ' . $money($totVal) . '</b></p>';
     $body .= '<table width="100%" style="margin-top:36px"><tr><td width="50%"></td><td width="50%" align="center" style="font-size:10px">Lampung, ' . date('d F Y') . '<br>Petugas Pendataan<br><br><br><b>( ................................ )</b></td></tr></table>';
+    break;
+
+case 'penerimaan':
+    // Berita Acara Penerimaan Barang/Jasa (detail satu penerimaan)
+    $r = q("SELECT r.*, uc.name AS penerima, p.plan_no, n.request_no
+            FROM receptions r LEFT JOIN user_cache uc ON uc.user_id=r.received_by
+            LEFT JOIN procurement_plans p ON p.id=r.plan_id LEFT JOIN needs_requests n ON n.id=r.need_id
+            WHERE r.id=?", [$docId])->fetch();
+    if (!$r) { $title = 'BERITA ACARA PENERIMAAN BARANG/JASA'; $body = '<p class="center muted">Data penerimaan tidak ditemukan (ID #' . $docId . ').</p>'; break; }
+    $title = 'BERITA ACARA PENERIMAAN BARANG/JASA';
+    $sub   = 'Nomor: ' . e($r['receive_no']) . ' · Tanggal: ' . date('d-m-Y', strtotime($r['receive_date']));
+    $ref   = $r['plan_no'] ? 'Rencana Pengadaan ' . $r['plan_no'] : ($r['request_no'] ? 'Kebutuhan ' . $r['request_no'] : '-');
+    $items = q("SELECT * FROM reception_items WHERE reception_id=? ORDER BY id", [$docId])->fetchAll();
+    $totVal = 0; $rows = [];
+    foreach ($items as $it) {
+        $totVal += (float)$it['qty_received'] * (float)$it['price'];
+        $rows[] = [e($it['item_name']), e(str_replace('_', ' ', $it['category'])),
+                   (int)$it['qty_ordered'] . ' ' . e($it['unit']), (int)$it['qty_received'] . ' ' . e($it['unit']),
+                   ['v' => $money($it['price']), 'cls' => 'right'],
+                   ['v' => $money((int)$it['qty_received'] * (float)$it['price']), 'cls' => 'right'],
+                   e(mb_strimwidth($it['note'] ?? '', 0, 30, '…'))];
+    }
+    $chk = fn($v) => $v ? '☑ Ya' : '☐ Tidak';
+    $body .= '<table class="data"><tr><th width="22%">Penerima</th><td><b>' . e($r['penerima'] ?? '-') . '</b></td>'
+           . '<th width="18%">Referensi</th><td>' . e($ref) . '</td></tr>'
+           . '<tr><th>Penyedia / Supplier</th><td>' . e($r['supplier'] ?? '-') . '</td>'
+           . '<th>No. Invoice</th><td>' . e($r['invoice_no'] ?? '-') . '</td></tr>'
+           . '<tr><th>Status Penerimaan</th><td colspan="3"><b>' . e($r['status']) . '</b></td></tr></table>';
+    $body .= '<h3 style="margin-top:14px">Checklist Penerimaan</h3><table class="data"><tr>'
+           . '<th>Jumlah Sesuai</th><th>Spesifikasi Sesuai</th><th>Kondisi Baik</th><th>Dokumen Lengkap</th></tr><tr>'
+           . '<td>' . $chk($r['chk_qty']) . '</td><td>' . $chk($r['chk_spec']) . '</td><td>' . $chk($r['chk_condition']) . '</td><td>' . $chk($r['chk_docs']) . '</td></tr></table>';
+    $body .= '<h3 style="margin-top:14px">Detail Item Diterima</h3>'
+           . tbl(['Nama Barang/Jasa', 'Kategori', 'Qty Pesan', 'Qty Terima', 'Harga Satuan (Rp)', 'Jumlah (Rp)', 'Catatan'], $rows)
+           . '<p><b>Total nilai diterima: Rp ' . $money($totVal) . '</b></p>';
+    if ($r['note']) $body .= '<p><b>Catatan:</b> ' . nl2br(e($r['note'])) . '</p>';
+    $body .= '<table width="100%" style="margin-top:36px"><tr>'
+           . '<td width="50%" align="center" style="font-size:10px">Yang Menyerahkan<br>(Penyedia/Pengantar)<br><br><br><b>( ................................ )</b></td>'
+           . '<td width="50%" align="center" style="font-size:10px">Yang Menerima<br>' . e($r['penerima'] ?? '') . '<br><br><br><b>( ................................ )</b></td></tr></table>';
+    break;
+
+case 'perlengkapan':
+    // Laporan Perlengkapan/ATK per periode (stok + mutasi + distribusi)
+    $title = 'LAPORAN PERLENGKAPAN / ATK';
+    $sups = q("SELECT s.*, l.name AS lokasi FROM supplies s LEFT JOIN locations l ON l.id=s.location_id ORDER BY s.category, s.name")->fetchAll();
+    $rows = [];
+    foreach ($sups as $s) {
+        $masuk = q("SELECT IFNULL(SUM(qty),0) t FROM supply_transactions WHERE supply_id=? AND type='MASUK' AND DATE(created_at) BETWEEN ? AND ?", [$s['id'], $from, $to])->fetch()['t'];
+        $keluar = q("SELECT IFNULL(SUM(qty),0) t FROM supply_transactions WHERE supply_id=? AND type='KELUAR' AND DATE(created_at) BETWEEN ? AND ?", [$s['id'], $from, $to])->fetch()['t'];
+        $rows[] = [e($s['code']), e($s['name']), e(str_replace('_', ' ', $s['category'])),
+                   (int)$masuk . ' ' . e($s['unit']), (int)$keluar, (int)$s['stock'], (int)$s['min_stock'],
+                   $s['stock_minimum_warning'] ? '<b>⚠ MINIMUM</b>' : 'Aman', e($s['lokasi'] ?? 'Gudang Umum')];
+    }
+    $body .= tbl(['Kode', 'Nama Barang', 'Kategori', 'Masuk (Periode)', 'Keluar (Periode)', 'Stok Akhir', 'Min.', 'Peringatan', 'Lokasi'], $rows);
+    $reqs = q("SELECT r.*, uc.name AS pemohon FROM supply_requests r LEFT JOIN user_cache uc ON uc.user_id=r.user_id
+               WHERE DATE(r.created_at) BETWEEN ? AND ? ORDER BY r.id", [$from, $to])->fetchAll();
+    $rows = [];
+    foreach ($reqs as $r) {
+        $items = q("SELECT i.qty_requested, i.qty_approved, s.name FROM supply_request_items i JOIN supplies s ON s.id=i.supply_id WHERE i.request_id=?", [$r['id']])->fetchAll();
+        $desc = implode(', ', array_map(fn($i) => $i['name'] . ' (' . (int)$i['qty_requested'] . '/' . (int)$i['qty_approved'] . ')', $items));
+        $rows[] = [e($r['request_no']), date('d-m-Y', strtotime($r['created_at'])), e($r['nama_bidang'] ?? '-'), e($r['pemohon'] ?? '-'),
+                   e(mb_strimwidth($desc, 0, 60, '…')), e($r['status'])];
+    }
+    $body .= '<h3 style="margin-top:16px">Permintaan ATK Periode Ini (' . count($reqs) . ')</h3>'
+           . tbl(['No. Permintaan', 'Tgl', 'Bidang/Unit', 'Pemohon', 'Item (diminta/disetujui)', 'Status'], $rows);
+    break;
+
+case 'serah_terima_kendaraan':
+    // Berita acara serah terima kendaraan (keluar/pengembalian) — bukan barang
+    $loan = q("SELECT l.*, v.tnkb, v.brand_model, v.year, uc.name AS peminjam, uc.nama_bidang,
+               ho.handover_no AS ho_no, ho.handover_date AS ho_date, ho.items_desc AS ho_items,
+               ho.sig_giver AS ho_sig_g, ho.sig_receiver AS ho_sig_r, ho.note AS ho_note,
+               hin.handover_no AS hi_no, hin.handover_date AS hi_date, hin.sig_giver AS hi_sig_g, hin.sig_receiver AS hi_sig_r
+               FROM vehicle_loans l JOIN vehicles v ON v.id=l.vehicle_id
+               LEFT JOIN user_cache uc ON uc.user_id=l.user_id
+               LEFT JOIN handovers ho ON ho.id=l.handover_out_id
+               LEFT JOIN handovers hin ON hin.id=l.handover_in_id
+               WHERE l.id=?", [$docId])->fetch();
+    if (!$loan) { $title = 'BERITA ACARA SERAH TERIMA KENDARAAN'; $body = '<p class="center muted">Data peminjaman tidak ditemukan (ID #' . $docId . ').</p>'; break; }
+    $absImg = function (?string $rel): string { return $rel && file_exists(BASE_PATH . '/' . $rel) ? 'file://' . BASE_PATH . '/' . ltrim($rel, '/') : ''; };
+    $isReturn = !empty($loan['hi_no']);
+    $title = 'BERITA ACARA SERAH TERIMA KENDARAAN' . ($isReturn ? ' (PENGEMBALIAN)' : ' (PEMINJAMAN)');
+    $sub   = 'No. Peminjaman: ' . e($loan['loan_no']) . ' · ' . e($loan['tnkb'] . ' — ' . ($loan['brand_model'] ?? ''));
+    $kmFmt = fn($v) => $v !== null ? number_format((int)$v, 0, ',', '.') : '-';
+    $body .= '<table class="data">'
+           . '<tr><th width="22%">Peminjam</th><td><b>' . e($loan['peminjam'] ?? '-') . '</b>' . ($loan['nama_bidang'] ? ' <span class="muted">(' . e($loan['nama_bidang']) . ')</span>' : '') . '</td>'
+           . '<th width="18%">Kendaraan</th><td><b>' . e($loan['tnkb']) . '</b><br>' . e(($loan['brand_model'] ?? '') . ' (' . ($loan['year'] ?? '-') . ')') . '</td></tr>'
+           . '<tr><th>Keperluan</th><td colspan="3">' . nl2br(e($loan['purpose'] ?? '-')) . '</td></tr>'
+           . '<tr><th>Pengemudi / Penumpang</th><td>' . e($loan['driver'] ?? '-') . ($loan['passengers'] ? ' / ' . e($loan['passengers']) : '') . '</td>'
+           . '<th>Pakai (Tanggal-Jam)</th><td>' . ($loan['start_date'] ? date('d-m-Y H:i', strtotime($loan['start_date'])) : '-') . ' s.d. ' . ($loan['end_date'] ? date('d-m-Y H:i', strtotime($loan['end_date'])) : '-') . '</td></tr>';
+    if ($loan['ho_no']) {
+        $body .= '<tr><th>Serah Terima Keluar</th><td>' . e($loan['ho_no']) . ' · ' . date('d-m-Y', strtotime($loan['ho_date'])) . '</td>'
+               . '<th>KM Awal</th><td>' . $kmFmt($loan['start_km']) . ' KM</td></tr>';
+    }
+    if ($isReturn) {
+        $body .= '<tr><th>Serah Terima Kembali</th><td>' . e($loan['hi_no']) . ' · ' . date('d-m-Y H:i', strtotime($loan['hi_date'])) . '</td>'
+               . '<th>KM Akhir</th><td>' . $kmFmt($loan['end_km']) . ' KM</td></tr>'
+               . '<tr><th>Kondisi Pengembalian</th><td colspan="3">' . nl2br(e($loan['return_condition'] ?? '-')) . '</td></tr>'
+               . '<tr><th>Catatan Pengembalian</th><td colspan="3">' . nl2br(e($loan['return_note'] ?? '-')) . '</td></tr>';
+    }
+    $body .= '<tr><th>Status</th><td colspan="3"><b>' . e($loan['status']) . '</b></td></tr></table>';
+    if ($loan['ho_items']) $body .= '<h3 style="margin-top:14px">Detail Serah Terima</h3><p>' . nl2br(e($loan['ho_items'])) . '</p>';
+    $sigG = $isReturn ? $absImg($loan['hi_sig_g']) : $absImg($loan['ho_sig_g']);
+    $sigR = $isReturn ? $absImg($loan['hi_sig_r']) : $absImg($loan['ho_sig_r']);
+    $sigBlock = '<table width="100%" style="margin-top:34px"><tr>'
+      . '<td width="50%" align="center" style="font-size:10px">Menyerahkan,<br>Bagian Umum/Pengadaan<br>'
+      . ($sigG ? '<img src="' . $sigG . '" height="70">' : '<div style="height:70px"></div>')
+      . '<b>( ................................ )</b></td>'
+      . '<td width="50%" align="center" style="font-size:10px">' . ($isReturn ? 'Mengembalikan,' : 'Menerima,') . '<br>' . e($loan['peminjam'] ?? '-') . '<br>'
+      . ($sigR ? '<img src="' . $sigR . '" height="70">' : '<div style="height:70px"></div>')
+      . '<b>( ................................ )</b></td></tr></table>';
+    $body .= $sigBlock;
+    break;
+
+case 'rencana':
+    // Detail satu rencana pengadaan
+    $p = q("SELECT p.*, uc.name AS pembuat FROM procurement_plans p LEFT JOIN user_cache uc ON uc.user_id=p.created_by WHERE p.id=?", [$docId])->fetch();
+    if (!$p) { $title = 'DOKUMEN RENCANA PENGADAAN'; $body = '<p class="center muted">Rencana pengadaan tidak ditemukan (ID #' . $docId . ').</p>'; break; }
+    $title = 'DOKUMEN RENCANA PENGADAAN';
+    $sub   = 'Nomor: ' . e($p['plan_no']) . ' · Tanggal: ' . date('d-m-Y', strtotime($p['plan_date']));
+    $items = q("SELECT * FROM procurement_plan_items WHERE plan_id=? ORDER BY id", [$docId])->fetchAll();
+    $totEst = 0; $rows = [];
+    foreach ($items as $it) {
+        $totEst += (float)$it['qty'] * (float)$it['est_price'];
+        $rows[] = [e($it['item_name']), e(str_replace('_', ' ', $it['category'] ?? '-')),
+                   (int)$it['qty'] . ' ' . e($it['unit'] ?? 'unit'),
+                   ['v' => $money($it['est_price']), 'cls' => 'right'],
+                   ['v' => $money((int)$it['qty'] * (float)$it['est_price']), 'cls' => 'right']];
+    }
+    $body .= '<table class="data"><tr><th width="22%">Unit Pemohon</th><td>' . e($p['requesting_units'] ?? '-') . '</td>'
+           . '<th width="18%">Prioritas</th><td>' . e($p['priority'] ?? '-') . '</td></tr>'
+           . '<tr><th>Dibuat Oleh</th><td>' . e($p['pembuat'] ?? '-') . '</td>'
+           . '<th>Anggaran (Rp)</th><td>' . $money($p['budget']) . '</td></tr>'
+           . '<tr><th>Status</th><td colspan="3"><b>' . e($p['status']) . '</b></td></tr></table>';
+    $body .= '<h3 style="margin-top:14px">Item yang Direncanakan</h3>'
+           . tbl(['Barang/Jasa', 'Kategori', 'Jumlah', 'Estimasi Harga (Rp)', 'Estimasi Total (Rp)'], $rows)
+           . '<p><b>Estimasi total rencana: Rp ' . $money($totEst) . '</b></p>';
+    if (!empty($p['note'])) $body .= '<p><b>Catatan:</b> ' . nl2br(e($p['note'])) . '</p>';
     break;
 }
 
