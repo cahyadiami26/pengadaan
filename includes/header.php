@@ -17,6 +17,7 @@ $nav = [
     ['pemeliharaan', 'Pemeliharaan & Perbaikan', '🛠️'],
     ['fasilitas', 'Fasilitas Kantor', '🏢'],
     ['kendaraan', 'Kendaraan', '🚗'],
+    ['peminjaman', 'Peminjaman Kendaraan', '🔑'],
     ['perawatan_kendaraan', 'Perawatan Kendaraan', '🔧'],
     ['laporan', 'Laporan', '📈'],
     ['pegawai', 'Data Pegawai', '👥'],

@@ -55,5 +55,7 @@ $due = $v['next_service_km'] && $v['last_km'] >= $v['next_service_km'] - 1000;
 <td><?= e($l['destination']) ?></td><td><?= (int)$l['start_km'] ?></td><td><?= $l['end_km'] !== null ? (int)$l['end_km'] : '-' ?></td><td><?= status_badge($l['status']) ?></td></tr><?php endforeach; ?>
 </table></div></div>
 <?php endif; ?>
-<div style="margin-bottom:20px"><a class="btn btn-sm btn-teal" href="laporan_pdf.php?jenis=kendaraan&id=<?= (int)$id ?>">📄 Export PDF Riwayat Servis</a> <a class="btn btn-sm btn-outline" href="kendaraan.php">← Kembali</a></div>
+<div style="margin-bottom:20px">
+  <?php if (can('peminjaman')): ?><a class="btn btn-sm btn-teal" href="peminjaman.php?vehicle=<?= (int)$id ?>">🔑 Ajukan Peminjaman</a><?php endif; ?>
+  <a class="btn btn-sm btn-teal" href="laporan_pdf.php?jenis=kendaraan&id=<?= (int)$id ?>">📄 Export PDF Riwayat Servis</a> <a class="btn btn-sm btn-outline" href="kendaraan.php">← Kembali</a></div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

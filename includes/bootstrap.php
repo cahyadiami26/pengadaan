@@ -127,6 +127,7 @@ function can($module): bool
         'perlengkapan'       => ['admin','staff_pengadaan','kepala_bidang','kepala_divisi','pimpinan','pegawai'],
         'fasilitas'          => ['admin','staff_pengadaan','kepala_bidang','kepala_divisi','pimpinan','pegawai'],
         'kendaraan'          => ['admin','staff_pengadaan','kepala_bidang','kepala_divisi','pimpinan','pegawai'],
+        'peminjaman'         => ['admin','staff_pengadaan','kepala_bidang','kepala_divisi','pimpinan','pegawai'],
         'perawatan_kendaraan'=> ['admin','staff_pengadaan','pimpinan'],
         'laporan'            => ['admin','staff_pengadaan','kepala_bidang','kepala_divisi','pimpinan'],
         'role_mapping'       => ['admin'],

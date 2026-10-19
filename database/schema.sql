@@ -373,13 +373,16 @@ CREATE TABLE IF NOT EXISTS vehicle_loans (
   vehicle_id INT NOT NULL,
   user_id INT NOT NULL,
   purpose TEXT, driver VARCHAR(120), passengers TEXT,
-  start_date DATE, end_date DATE,
+  start_date DATETIME, end_date DATETIME,
   start_km INT, end_km INT, fuel_cost DECIMAL(15,2) DEFAULT 0,
   proof_file VARCHAR(255),
   return_condition TEXT, return_note TEXT,
   status ENUM('MENUNGGU','DISETUJUI','DIGUNAKAN','DIKEMBALIKAN','DITOLAK') DEFAULT 'MENUNGGU',
-  approved_by INT NULL, returned_at DATETIME NULL, confirmed_by INT NULL,
+  approved_by INT NULL, approve_note TEXT, rejected_at DATETIME NULL,
+  handover_out_id INT NULL, handover_in_id INT NULL,
+  returned_at DATETIME NULL, confirmed_by INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
 ) ENGINE=InnoDB;
 

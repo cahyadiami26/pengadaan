@@ -38,7 +38,10 @@ $rows = q("SELECT v.*, (SELECT SUM(cost) FROM vehicle_services s WHERE s.vehicle
 require __DIR__ . '/../includes/header.php';
 ?>
 <div class="card"><h3>🚗 Kendaraan Operasional &amp; Truk (<?= count($rows) ?>)
-  <?php if (is_in_role(['admin','staff_pengadaan'])): ?><button class="btn btn-sm btn-primary" onclick="openModal('mAdd')">➕ Tambah Kendaraan</button><?php endif; ?></h3>
+  <span style="float:right;display:flex;gap:8px">
+  <?php if (can('peminjaman')): ?><a class="btn btn-sm btn-teal" href="peminjaman.php">🔑 Peminjaman</a><?php endif; ?>
+  <?php if (is_in_role(['admin','staff_pengadaan'])): ?><button class="btn btn-sm btn-primary" onclick="openModal('mAdd')">➕ Tambah Kendaraan</button><?php endif; ?>
+  </span></h3>
 <div class="table-wrap"><table class="tbl">
 <tr><th>TNKB</th><th>Kendaraan</th><th>Tahun</th><th>Kondisi</th><th>Lokasi</th><th>PIC</th><th>Status</th><th class="num">KM Terakhir</th><th>Service Berikutnya</th><th class="num">Total Biaya Servis</th><th></th></tr>
 <?php foreach ($rows as $v): $due = $v['next_service_km'] && $v['last_km'] >= $v['next_service_km'] - 1000; ?>
