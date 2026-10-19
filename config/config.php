@@ -6,13 +6,13 @@
 
 // ---- Database (aplikasi) ----
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'pengadaan_lju');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_NAME', 'ljucoid_pbj');
+define('DB_USER', 'ljucoid_pbj');
+define('DB_PASS', 'icikiwir2026');
 
 // ---- Database SSO/users (database berbeda, satu mesin) ----
 define('SSO_DB_HOST', 'localhost');
-define('SSO_DB_NAME', 'lju_portal'); // sesuaikan dengan nama DB users produksi
+define('SSO_DB_NAME', 'ljucoid_dms'); // sesuaikan dengan nama DB users produksi
 
 // ---- URL & Path ----
 define('APP_NAME', 'Sistem Pengadaan Barang/Jasa');
