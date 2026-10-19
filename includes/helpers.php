@@ -52,22 +52,28 @@ function initials_of(string $name): string
 /**
  * Avatar user: pakai file dari https://dms.lju.co.id/uploads/avatars/{avatar},
  * fallback ke inisial nama jika tidak ada file avatar / gambar gagal dimuat.
+ * Ukuran responsif via CSS (.avatar + --av): mengecil otomatis di layar sempit,
+ * dibatasi maks 40px agar tidak terlihat terlalu besar.
  */
 function avatar_html(?string $avatar, string $name, int $size = 36): string
 {
     $initials = initials_of($name);
-    $style = "width:{$size}px;height:{$size}px;font-size:" . max(11, (int)($size * 0.4)) . "px;";
-    $ini = '<span class="avatar-initials" style="' . $style . '">' . e($initials) . '</span>';
+    $size = max(20, min(40, $size));
+    $fs = max(10, (int)round($size * 0.38));
+    // Gunakan var(--av, Npx) sebagai FALLBACK saja; CSS dapat menimpa --av
+    // secara responsif tanpa diblokir oleh inline style.
+    $wrapStyle = 'display:inline-flex;position:relative;width:var(--av,' . $size . 'px);height:var(--av,' . $size . 'px);';
+    $iniStyle  = 'width:var(--av,' . $size . 'px);height:var(--av,' . $size . 'px);font-size:' . $fs . 'px;';
+    $ini = '<span class="avatar-initials" style="' . $iniStyle . '">' . e($initials) . '</span>';
     if ($avatar) {
         $src = e(AVATAR_BASE_URL . rawurlencode($avatar));
-        return '<span class="avatar-wrap" style="display:inline-flex;position:relative;width:' . $size . 'px;height:' . $size . 'px">'
+        return '<span class="avatar-wrap" style="' . $wrapStyle . '">'
              . $ini
              . '<img class="avatar-photo" src="' . $src . '" alt="' . e($name) . '" title="' . e($name) . '"'
-             . ' style="position:absolute;inset:0;border-radius:50%;object-fit:cover;display:none"'
              . ' onload="this.style.display=\'block\';this.previousElementSibling.style.display=\'none\'"'
              . ' onerror="this.remove()"></span>';
     }
-    return $ini;
+    return str_replace('class="avatar-initials"', 'class="avatar-initials avatar"', $ini);
 }
 
 /** Badge status berwarna */

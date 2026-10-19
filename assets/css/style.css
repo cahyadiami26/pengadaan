@@ -87,15 +87,27 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:14px}
 .filters .form-group{margin-bottom:0;min-width:160px}
 
-/* Avatar */
-.avatar-initials,.avatar-img{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--teal);color:#fff;font-weight:700;overflow:hidden;flex:0 0 auto}
+/* ===== Avatar (responsif) ===== */
+.avatar-wrap{display:inline-flex;position:relative;flex:0 0 auto;width:var(--av,32px);height:var(--av,32px);vertical-align:middle}
+.avatar-initials,.avatar-img{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--teal);color:#fff;font-weight:700;overflow:hidden;flex:0 0 auto;width:var(--av,32px);height:var(--av,32px)}
+.avatar-photo{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;display:none}
 .avatar-img img{width:100%;height:100%;object-fit:cover}
-.avatar-fallback::after{content:''}
 span.avatar-img{display:none}
-.avatar-img + .avatar-initials{display:inline-flex}
 /* when image loads keep initials hidden via sibling trick */
 .avatar-ok .avatar-initials{display:none !important}
 .avatar-ok .avatar-img{display:inline-flex !important}
+/* Avatar di dalam tabel & topbar sedikit lebih kecil agar rapi */
+.tbl td .avatar-wrap,.tbl td .avatar-initials{--av:26px}
+.user-chip .avatar-wrap{--av:32px}
+@media (max-width:900px){
+  .avatar-wrap,.avatar-initials{--av:26px}
+  .user-chip .avatar-wrap{--av:28px}
+}
+@media (max-width:600px){
+  .avatar-wrap,.avatar-initials{--av:24px}
+  .user-chip .avatar-wrap{--av:26px}
+  .tbl td .avatar-wrap,.tbl td .avatar-initials{--av:22px}
+}
 
 /* Workflow steps */
 .workflow{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
@@ -160,3 +172,25 @@ span.avatar-img{display:none}
 .tabs .tab.active{color:var(--navy);background:#eef4ff;border-color:var(--line);position:relative;top:2px;border-bottom:2px solid #eef4ff}
 /* Baris checkbox inline (checklist penerimaan) */
 .check-line{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:6px 0}
+
+/* ===== Enhanced Select (pengganti Select2, tanpa jQuery) ===== */
+.es-wrap{position:relative;display:block}
+.es-native{position:absolute!important;width:1px;height:1px;opacity:0;margin:0;padding:0;border:0;clip:rect(0 0 0 0);overflow:hidden;pointer-events:none}
+.es-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--text,#1e293b);background:#fff;border:1px solid var(--line,#d7dee8);border-radius:8px;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s}
+.es-btn:hover{border-color:#94a3b8}
+.es-open .es-btn{border-color:var(--teal,#0d9488);box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+.es-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.es-placeholder{color:#94a3b8}
+.es-arrow{font-size:11px;color:var(--muted,#64748b);flex:none}
+.es-panel{position:absolute;z-index:1200;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--line,#d7dee8);border-radius:10px;box-shadow:0 12px 32px rgba(15,42,67,.18);overflow:hidden}
+.es-search{display:block;width:100%;border:none;border-bottom:1px solid var(--line,#e2e8f0);padding:10px 12px;font-size:13.5px;font-family:inherit;outline:none}
+.es-list{max-height:240px;overflow-y:auto;padding:4px}
+.es-item{display:block;width:100%;text-align:left;padding:8px 10px;font-size:13.5px;font-family:inherit;color:var(--text,#1e293b);background:none;border:none;border-radius:6px;cursor:pointer}
+.es-item:hover{background:#eef4ff;color:var(--navy,#0f2a43)}
+.es-item.es-active{background:#e6f7f4;color:var(--teal,#0d9488);font-weight:600}
+.es-item.es-muted{color:#94a3b8}
+.es-empty{padding:12px;text-align:center;font-size:13px;color:#94a3b8}
+@media (max-width:600px){
+  .es-list{max-height:180px}
+  .es-btn{padding:8px 10px;font-size:13.5px}
+}
