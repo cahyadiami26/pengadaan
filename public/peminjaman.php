@@ -36,9 +36,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$errors) {
             $no = gen_no('vehicle_loans', 'loan_no', 'PIN');
+            /* CATATAN: semua nilai dipakai sebagai placeholder (?) — jangan campur
+               literal string di dalam VALUES karena parser MySQL lama dapat salah
+               menghitung jumlah kolom (error #1136). */
             q("INSERT INTO vehicle_loans (loan_no, vehicle_id, user_id, purpose, driver, passengers, start_date, end_date, start_km, status)
-               VALUES (?,?,?,?,?,?,?,?,'MENUNGGU')",
-              [$no, $vid, $_SESSION['user_id'], $purpose, $driver, $passengers, $startAt, $endAt]);
+               VALUES (?,?,?,?,?,?,?,?,?,?)",
+              [$no, $vid, $_SESSION['user_id'], $purpose, $driver, $passengers, $startAt, $endAt, null, 'MENUNGGU']);
             refresh_notification_cache();
             flash_set('success', 'Pengajuan peminjaman <b>' . e($no) . '</b> dikirim. Menunggu persetujuan Bagian Umum/Pengadaan.');
             header('Location: peminjaman.php'); exit;
